@@ -67,9 +67,11 @@ struct graphic_buffer* graphic_buffer_new_existing(uint32_t w, uint32_t h,
         return NULL;
 
 #if ANDROID_VERSION_MAJOR>=8
-    buffer->self = new android::GraphicBuffer(w, h, format, 1, usage, stride, (native_handle_t*) handle, keepOwnership);
+    buffer->self = new android::GraphicBuffer(w, h, format, 1/* layerCount */, usage, stride,
+                                              (native_handle_t*) handle, keepOwnership);
 #else
-    buffer->self = new android::GraphicBuffer(w, h, format, usage, stride, (native_handle_t*) handle, keepOwnership);
+    buffer->self = new android::GraphicBuffer(w, h, format, usage, stride,
+                                              (native_handle_t*) handle, keepOwnership);
 #endif
 
     return buffer;
@@ -113,7 +115,11 @@ uint32_t graphic_buffer_reallocate(struct graphic_buffer *buffer, uint32_t w,
                                    uint32_t h, int32_t f, uint32_t usage)
 {
 #if ANDROID_VERSION_MAJOR>=8
+<<<<<<< HEAD
     return buffer->self->reallocate(w, h, f, 1, usage);
+=======
+    return buffer->self->reallocate(w, h, f, 1/* layerCount */, usage);
+>>>>>>> b60b3a7 (hybris: compat: Fix ui compatibility layer for android 9)
 #else
     return buffer->self->reallocate(w, h, f, usage);
 #endif
