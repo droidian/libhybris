@@ -65,5 +65,11 @@ at https://groups.google.com/forum/#!topic/generic-abi/bX460iggiKg
 #define DT_ANDROID_RELA (DT_LOOS + 4)
 #define DT_ANDROID_RELASZ (DT_LOOS + 5)
 
+/*
+ * From bionic/libc/include/bits/elf_arm64.h
+ */
+#define R_AARCH64_TLS_DTPREL64          1028    /* Module-relative offset. */
+#define R_AARCH64_TLS_DTPMOD64          1029    /* Module index. */
+#define R_AARCH64_TLS_TPREL64           1030    /* TP-relative offset. */
 
 #endif
