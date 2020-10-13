@@ -1942,7 +1942,7 @@ static soinfo* find_library(android_namespace_t* ns,
   soinfo* si = nullptr;
 
   if (name == nullptr) {
-    si = solist_get_somain();
+    si = nullptr;//solist_get_somain();
   } else if (!find_libraries(ns,
                              needed_by,
                              &name,
@@ -3471,33 +3471,23 @@ bool soinfo::prelink_image() {
         break;
 
       case DT_HASH:
-        if(d->d_un.d_ptr > load_bias)
-          base = d->d_un.d_ptr;
-        else
-          base = load_bias + d->d_un.d_ptr;
-
-        nbucket_ = reinterpret_cast<uint32_t*>(base)[0];
-        nchain_ = reinterpret_cast<uint32_t*>(base)[1];
-        bucket_ = reinterpret_cast<uint32_t*>(base + 8);
-        chain_ = reinterpret_cast<uint32_t*>(base+ 8 + nbucket_ * 4);
+        nbucket_ = reinterpret_cast<uint32_t*>(load_bias + d->d_un.d_ptr)[0];
+        nchain_ = reinterpret_cast<uint32_t*>(load_bias + d->d_un.d_ptr)[1];
+        bucket_ = reinterpret_cast<uint32_t*>(load_bias + d->d_un.d_ptr + 8);
+        chain_ = reinterpret_cast<uint32_t*>(load_bias + d->d_un.d_ptr + 8 + nbucket_ * 4);
         break;
 
       case DT_GNU_HASH:
-        if(d->d_un.d_ptr > load_bias)
-          base = d->d_un.d_ptr;
-        else
-          base = load_bias + d->d_un.d_ptr;
-
-        gnu_nbucket_ = reinterpret_cast<uint32_t*>(base)[0];
+        gnu_nbucket_ = reinterpret_cast<uint32_t*>(load_bias + d->d_un.d_ptr)[0];
         // skip symndx
-        gnu_maskwords_ = reinterpret_cast<uint32_t*>(base)[2];
-        gnu_shift2_ = reinterpret_cast<uint32_t*>(base)[3];
+        gnu_maskwords_ = reinterpret_cast<uint32_t*>(load_bias + d->d_un.d_ptr)[2];
+        gnu_shift2_ = reinterpret_cast<uint32_t*>(load_bias + d->d_un.d_ptr)[3];
 
-        gnu_bloom_filter_ = reinterpret_cast<ElfW(Addr)*>(base + 16);
+        gnu_bloom_filter_ = reinterpret_cast<ElfW(Addr)*>(load_bias + d->d_un.d_ptr + 16);
         gnu_bucket_ = reinterpret_cast<uint32_t*>(gnu_bloom_filter_ + gnu_maskwords_);
         // amend chain for symndx = header[1]
         gnu_chain_ = gnu_bucket_ + gnu_nbucket_ -
-            reinterpret_cast<uint32_t*>(base)[1];
+            reinterpret_cast<uint32_t*>(load_bias + d->d_un.d_ptr)[1];
 
         if (!powerof2(gnu_maskwords_)) {
           DL_ERR("invalid maskwords for gnu_hash = 0x%x, in \"%s\" expecting power to two",
@@ -4261,12 +4251,14 @@ std::vector<android_namespace_t*> init_default_namespaces(const char* executable
   }
   // we can no longer rely on the fact that libdl.so is part of default namespace
   // this is why we want to add ld-android.so to all namespaces from ld.config.txt
-  soinfo* ld_android_so = solist_get_head();
+//hybris we have no libdl soinfo
+//  soinfo* ld_android_so = solist_get_head();
 
   // we also need vdso to be available for all namespaces (if present)
   soinfo* vdso = solist_get_vdso();
   for (auto it : namespaces) {
-    it.second->add_soinfo(ld_android_so);
+// hybris we have no libdl soinfo
+  //  it.second->add_soinfo(ld_android_so);
     if (vdso != nullptr) {
       it.second->add_soinfo(vdso);
     }
