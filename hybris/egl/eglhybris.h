@@ -27,6 +27,10 @@ extern "C" {
 #endif
 
 void __eglHybrisSetError(EGLint error);
+#ifdef WANT_GLVND
+EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
+            void *display_id, const EGLAttrib *attrib_list);
+#endif
 
 void hybris_dump_buffer_to_file(struct ANativeWindowBuffer *buf);
 
