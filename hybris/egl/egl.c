@@ -45,6 +45,8 @@ static void *_hybris_libgles1 = NULL;
 static void *_hybris_libgles2 = NULL;
 static int _egl_context_client_version = 1;
 
+static EGLint      (*_eglGetError)(void) = NULL;
+
 static EGLDisplay  (*_eglGetDisplay)(EGLNativeDisplayType display_id) = NULL;
 static EGLBoolean  (*_eglTerminate)(EGLDisplay dpy) = NULL;
 
@@ -104,7 +106,25 @@ struct ws_egl_interface hybris_egl_interface = {
 	egl_helper_get_mapping,
 };
 
-HYBRIS_IMPLEMENT_FUNCTION0(egl, EGLint, eglGetError);
+static __thread EGLint __eglError = EGL_SUCCESS;
+
+void __eglHybrisSetError(EGLint error)
+{
+	__eglError = error;
+}
+
+EGLint eglGetError(void)
+{
+	HYBRIS_DLSYSM(egl, &_eglGetError, "eglGetError");
+
+	if (__eglError != EGL_SUCCESS) {
+		EGLint error = __eglError;
+		__eglError = EGL_SUCCESS;
+		return error;
+	}
+
+	return _eglGetError();
+}
 
 #define _EGL_MAX_DISPLAYS 100
 
@@ -363,6 +383,7 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	OVERRIDE_SAMENAME(eglDestroyImageKHR),
 	OVERRIDE_MY(eglSwapBuffersWithDamageEXT),
 	OVERRIDE_MY(glEGLImageTargetTexture2DOES),
+	OVERRIDE_SAMENAME(eglGetError),
 	OVERRIDE_SAMENAME(eglGetDisplay),
 	OVERRIDE_SAMENAME(eglTerminate),
 	OVERRIDE_SAMENAME(eglCreateWindowSurface),
