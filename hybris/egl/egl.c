@@ -33,6 +33,7 @@
 
 
 #include <hybris/common/binding.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <system/window.h>
@@ -43,6 +44,8 @@ static void *glesv2_handle = NULL;
 static void *_hybris_libgles1 = NULL;
 static void *_hybris_libgles2 = NULL;
 static int _egl_context_client_version = 1;
+
+static EGLint      (*_eglGetError)(void) = NULL;
 
 static EGLDisplay  (*_eglGetDisplay)(EGLNativeDisplayType display_id) = NULL;
 static EGLBoolean  (*_eglTerminate)(EGLDisplay dpy) = NULL;
@@ -103,7 +106,25 @@ struct ws_egl_interface hybris_egl_interface = {
 	egl_helper_get_mapping,
 };
 
-HYBRIS_IMPLEMENT_FUNCTION0(egl, EGLint, eglGetError);
+static __thread EGLint __eglError = EGL_SUCCESS;
+
+void __eglHybrisSetError(EGLint error)
+{
+	__eglError = error;
+}
+
+EGLint eglGetError(void)
+{
+	HYBRIS_DLSYSM(egl, &_eglGetError, "eglGetError");
+
+	if (__eglError != EGL_SUCCESS) {
+		EGLint error = __eglError;
+		__eglError = EGL_SUCCESS;
+		return error;
+	}
+
+	return _eglGetError();
+}
 
 #define _EGL_MAX_DISPLAYS 100
 
@@ -139,9 +160,69 @@ struct _EGLDisplay *hybris_egl_display_get_mapping(EGLDisplay display)
 	return EGL_NO_DISPLAY;
 }
 
-EGLDisplay eglGetDisplay(EGLNativeDisplayType display_id)
+static const char * _defaultEglPlatform()
 {
+	char *egl_platform;
+
+	// Mesa uses EGL_PLATFORM for its own purposes.
+	// Add HYBRIS_EGLPLATFORM to avoid the conflicts
+	egl_platform = getenv("HYBRIS_EGLPLATFORM");
+
+	if (egl_platform == NULL)
+		egl_platform = getenv("EGL_PLATFORM");
+
+	// The env variables may be defined yet empty
+	if (egl_platform == NULL || strcmp(egl_platform, "") == 0)
+		egl_platform = DEFAULT_EGL_PLATFORM;
+
+	return egl_platform;
+}
+
+#ifndef WANT_GLVND
+static
+#endif
+EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
+        void *display_id, const EGLAttrib *attrib_list)
+{
+	// We have nothing to do with attrib_list at the moment. Silence the unused
+	// variable warning.
+	(void) attrib_list;
+
 	HYBRIS_DLSYSM(egl, &_eglGetDisplay, "eglGetDisplay");
+
+	if (!_eglGetDisplay) {
+		__eglHybrisSetError(EGL_NOT_INITIALIZED);
+		return EGL_NO_DISPLAY;
+	}
+
+	const char * hybris_ws;
+	switch (platform) {
+		case EGL_NONE:
+			hybris_ws = _defaultEglPlatform();
+			break;
+
+		case EGL_PLATFORM_ANDROID_KHR:
+			// "null" ws passthrough everything, which essentially means
+			// the Android platform. Beware confustion with NULL value.
+			hybris_ws = "null";
+			break;
+
+#ifdef WANT_WAYLAND
+		case EGL_PLATFORM_WAYLAND_KHR:
+			hybris_ws = "wayland";
+			break;
+#endif
+
+		default:
+			__eglHybrisSetError(EGL_BAD_PARAMETER);
+			return EGL_NO_DISPLAY;
+	}
+
+	if (ws_init(hybris_ws) == EGL_FALSE) { // Other ws already loaded.
+		__eglHybrisSetError(EGL_BAD_PARAMETER);
+		return EGL_NO_DISPLAY;
+	}
+
 	EGLNativeDisplayType real_display;
 
 	real_display = (*_eglGetDisplay)(EGL_DEFAULT_DISPLAY);
@@ -161,6 +242,22 @@ EGLDisplay eglGetDisplay(EGLNativeDisplayType display_id)
 	}
 
 	return real_display;
+}
+
+EGLDisplay eglGetDisplay(EGLNativeDisplayType display_id)
+{
+	return __eglHybrisGetPlatformDisplayCommon(EGL_NONE, display_id, NULL);
+}
+
+EGLDisplay eglGetPlatformDisplay(EGLenum platform,
+        void *display_id, const EGLAttrib *attrib_list)
+{
+	if (platform == EGL_NONE) {
+		__eglHybrisSetError(EGL_BAD_PARAMETER);
+		return EGL_NO_DISPLAY;
+	}
+
+	return __eglHybrisGetPlatformDisplayCommon(platform, display_id, attrib_list);
 }
 
 HYBRIS_IMPLEMENT_FUNCTION3(egl, EGLBoolean, eglInitialize, EGLDisplay, EGLint *, EGLint *);
@@ -349,39 +446,88 @@ static void _my_glEGLImageTargetTexture2DOES(GLenum target, GLeglImageOES image)
 	(*_glEGLImageTargetTexture2DOES)(target, img ? img->egl_image : NULL);
 }
 
+struct FuncNamePair {
+	const char * name;
+	__eglMustCastToProperFunctionPointerType func;
+};
+
+#define OVERRIDE_SAMENAME(function) { .name = #function, .func = (__eglMustCastToProperFunctionPointerType) function }
+#define OVERRIDE_MY(function) { .name = #function, .func = (__eglMustCastToProperFunctionPointerType) _my_ ## function }
+
+static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
+	OVERRIDE_MY(eglCreateImageKHR),
+	OVERRIDE_SAMENAME(eglDestroyImageKHR),
+	OVERRIDE_MY(eglSwapBuffersWithDamageEXT),
+	OVERRIDE_MY(glEGLImageTargetTexture2DOES),
+	OVERRIDE_SAMENAME(eglGetError),
+	OVERRIDE_SAMENAME(eglGetDisplay),
+	OVERRIDE_SAMENAME(eglGetPlatformDisplay),
+	OVERRIDE_SAMENAME(eglTerminate),
+	OVERRIDE_SAMENAME(eglCreateWindowSurface),
+	OVERRIDE_SAMENAME(eglDestroySurface),
+	OVERRIDE_SAMENAME(eglSwapInterval),
+	OVERRIDE_SAMENAME(eglCreateContext),
+	OVERRIDE_SAMENAME(eglSwapBuffers),
+	OVERRIDE_SAMENAME(eglGetProcAddress),
+};
+static EGLBoolean _eglHybrisOverrideFunctions_sorted = EGL_FALSE;
+
+#undef OVERRIDE_SANENAME
+#undef OVERRIDE_MY
+
+static int compare_sort(const void * a, const void * b)
+{
+	const struct FuncNamePair *f_a = a, *f_b = b;
+	return strcmp(f_a->name, f_b->name);
+}
+
+static int compare_search(const void * key, const void * item)
+{
+	const struct FuncNamePair *f_item = item;
+	return strcmp(key, f_item->name);
+}
+
 __eglMustCastToProperFunctionPointerType eglGetProcAddress(const char *procname)
 {
 	HYBRIS_DLSYSM(egl, &_eglGetProcAddress, "eglGetProcAddress");
-	if (strcmp(procname, "eglCreateImageKHR") == 0)
-	{
-		return (__eglMustCastToProperFunctionPointerType) _my_eglCreateImageKHR;
+
+	if (!_eglHybrisOverrideFunctions_sorted) {
+		_eglHybrisOverrideFunctions_sorted = EGL_TRUE;
+		qsort(
+			_eglHybrisOverrideFunctions,
+			sizeof(_eglHybrisOverrideFunctions) / sizeof(_eglHybrisOverrideFunctions[0]),
+			sizeof(struct FuncNamePair),
+			compare_sort
+		);
 	}
-	else if (strcmp(procname, "eglDestroyImageKHR") == 0)
-	{
-		return (__eglMustCastToProperFunctionPointerType) eglDestroyImageKHR;
-	}
-	else if (strcmp(procname, "eglSwapBuffersWithDamageEXT") == 0)
-	{
-		return (__eglMustCastToProperFunctionPointerType) _my_eglSwapBuffersWithDamageEXT;
-	}
-	else if (strcmp(procname, "glEGLImageTargetTexture2DOES") == 0)
-	{
-		return (__eglMustCastToProperFunctionPointerType) _my_glEGLImageTargetTexture2DOES;
-	}
+
+	struct FuncNamePair *result = bsearch(
+		procname,
+		_eglHybrisOverrideFunctions,
+		sizeof(_eglHybrisOverrideFunctions) / sizeof(_eglHybrisOverrideFunctions[0]),
+		sizeof(struct FuncNamePair),
+		compare_search
+	);
+	if (result)
+		return result->func;
 
 	__eglMustCastToProperFunctionPointerType ret = NULL;
 
 	switch (_egl_context_client_version) {
 		case 1:  // OpenGL ES 1.x API
 			if (_hybris_libgles1 == NULL) {
-				_hybris_libgles1 = (void *) dlopen(getenv("HYBRIS_LIBGLESV1") ?: "libGLESv1_CM.so.1", RTLD_LAZY);
+				_hybris_libgles1 = (void *) dlopen(
+					getenv("HYBRIS_LIBGLESV1") ?: "libGLESv1_CM" GL_LIB_SUFFIX ".so.1",
+					RTLD_LOCAL | RTLD_LAZY);
 			}
 			ret = _hybris_libgles1 ? dlsym(_hybris_libgles1, procname) : NULL;
 			break;
 		case 2:  // OpenGL ES 2.0 API
 		case 3:  // OpenGL ES 3.x API, backwards compatible with OpenGL ES 2.0 so we implement in same library
 			if (_hybris_libgles2 == NULL) {
-				_hybris_libgles2 = (void *) dlopen(getenv("HYBRIS_LIBGLESV2") ?: "libGLESv2.so.2", RTLD_LAZY);
+				_hybris_libgles2 = (void *) dlopen(
+					getenv("HYBRIS_LIBGLESV2") ?: "libGLESv2" GL_LIB_SUFFIX ".so.2",
+					RTLD_LOCAL | RTLD_LAZY);
 			}
 			ret = _hybris_libgles2 ? dlsym(_hybris_libgles2, procname) : NULL;
 			break;
