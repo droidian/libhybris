@@ -48,6 +48,8 @@ LOCAL_C_INCLUDES := \
     frameworks/av/services/camera/libcameraservice
 
 IS_ANDROID_5 := $(shell test $(ANDROID_VERSION_MAJOR) -ge 5 && echo true)
+IS_ANDROID_8 := $(shell test $(ANDROID_VERSION_MAJOR) -ge 8 && echo true)
+IS_ANDROID_10 := $(shell test $(ANDROID_VERSION_MAJOR) -ge 10 && echo true)
 
 ifeq ($(IS_ANDROID_5),true)
 LOCAL_C_INCLUDES += system/media/camera/include
@@ -95,7 +97,6 @@ include $(LOCAL_PATH)/../Android.common.mk
 
 HYBRIS_PATH := $(LOCAL_PATH)/../../hybris
 
-IS_ANDROID_8 := $(shell test $(ANDROID_VERSION_MAJOR) -ge 8 && echo true)
 ifneq ($(IS_ANDROID_8),true)
     LOCAL_CFLAGS += -std=gnu++0x
 endif
@@ -158,9 +159,12 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(IS_ANDROID_8),true)
 LOCAL_SHARED_LIBRARIES += \
-    liblog \
-    libmedia_omx \
-    libmediaextractor
+	liblog \
+	libmedia_omx
+ifeq ($(IS_ANDROID_10),false)
+LOCAL_SHARED_LIBRARIES += \
+	libmediaextractor
+endif
 endif
 
 LOCAL_C_INCLUDES := \
