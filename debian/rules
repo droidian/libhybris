@@ -69,6 +69,10 @@ ARCH_CONFIGURATION = \
 	--enable-arch=x86
 endif
 
+override_dh_install:
+	dh_install -O--sourcedirectory=hybris
+	rm -f $(CURDIR)/debian/libhybris-test/usr/bin/test_opencl
+
 override_dh_auto_configure:
 	dh_auto_configure --sourcedirectory=hybris -- \
 		$(DEFAULT_CONFIGURATION) \
