@@ -16,3 +16,6 @@
 /usr/lib/*/libGLESv2.so*
 /usr/lib/*/libGLESv1_CM.so*
 /usr/lib/*/libOpenCL.so*
+
+# test_opencl
+/usr/bin/test_opencl

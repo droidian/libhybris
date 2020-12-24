@@ -85,6 +85,9 @@ override_dh_auto_configure:
 		$(ARCH_CONFIGURATION)
 
 override_dh_install:
+	dh_install -O--sourcedirectory=hybris
+	rm -f $(CURDIR)/debian/libhybris-test/usr/bin/test_opencl
+
 	# Create the flatpak extension
 	mkdir -p $(CURDIR)/debian/flatpak-extension-gl-hybris/$(FLATPAK_EXTENSION_TARGET)
 	for pkg in $(PKG_driver) libhybris-common1 libhardware2; do \
