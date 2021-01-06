@@ -3,6 +3,7 @@ include $(CLEAR_VARS)
 include $(LOCAL_PATH)/../Android.common.mk
 
 HYBRIS_PATH := $(LOCAL_PATH)/../../hybris
+IS_ANDROID_10 := $(shell test $(ANDROID_VERSION_MAJOR) -ge 10 && echo true)
 
 LOCAL_CFLAGS += -std=gnu++0x
 
@@ -15,9 +16,16 @@ LOCAL_SHARED_LIBRARIES := \
 	libinput \
 	libcutils \
 	libutils \
-	libskia \
 	libgui \
 	libandroidfw
+
+ifeq ($(IS_ANDROID_10),true)
+LOCAL_STATIC_LIBRARIES += \
+	libskia
+else
+LOCAL_SHARED_LIBRARIES += \
+	libskia
+endif
 
 LOCAL_C_INCLUDES := \
 	$(HYBRIS_PATH)/include \
@@ -70,9 +78,16 @@ LOCAL_SHARED_LIBRARIES := \
 	libis_compat_layer \
 	libcutils \
 	libutils \
-	libskia \
 	libgui \
 	libandroidfw
+
+ifeq ($(IS_ANDROID_10),true)
+LOCAL_STATIC_LIBRARIES += \
+	libskia
+else
+LOCAL_SHARED_LIBRARIES += \
+	libskia
+endif
 
 static_libraries := \
 	libgtest \
