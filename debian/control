@@ -1,7 +1,7 @@
 Source: libhybris
 Priority: optional
 Maintainer: Halium Developers <admin@halium.org>
-Build-Depends: android-headers,
+Build-Depends: android-headers-28,
                debhelper (>= 12),
                libwayland-dev,
                pkg-config,
@@ -43,7 +43,7 @@ Description: Library to provide access to the Android Media HAL
 Package: libmedia-dev
 Section: libdevel
 Architecture: amd64 arm64 armhf i386
-Depends: android-headers,
+Depends: android-headers-28,
          libmedia1 (= ${binary:Version}),
          ${misc:Depends}
 Description: Development files for libmedia
@@ -67,7 +67,7 @@ Description: Library to provide access to the Android libhardware HAL
 Package: libhardware-dev
 Section: libdevel
 Architecture: amd64 arm64 armhf i386
-Depends: android-headers,
+Depends: android-headers-28,
          libhardware2 (= ${binary:Version}),
          ${misc:Depends}
 Description: Development files for libhardware
@@ -114,7 +114,7 @@ Description: Allows one to run bionic-based HW adaptations in glibc systems - li
 Package: libhybris-dev
 Section: libdevel
 Architecture: amd64 arm64 armhf i386
-Depends: android-headers,
+Depends: android-headers-28,
          libandroid-properties-dev (= ${binary:Version}),
          libgles2-mesa-dev,
          libhardware-dev (= ${binary:Version}),
