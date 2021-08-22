@@ -48,15 +48,13 @@ ifeq ($(DEB_HOST_ARCH),$(findstring $(DEB_HOST_ARCH), armhf))
 ARCH_CONFIGURATION = \
 	--enable-arch=arm \
 	--enable-arm-tracing \
-	--enable-mali-quirks \
-	--enable-adreno-quirks
+	--enable-mali-quirks
 endif
 ifeq ($(DEB_HOST_ARCH),$(findstring $(DEB_HOST_ARCH), arm64))
 ARCH_CONFIGURATION = \
 	--enable-arch=arm64 \
 	--enable-arm-tracing \
-	--enable-mali-quirks \
-	--enable-adreno-quirks
+	--enable-mali-quirks
 endif
 ifeq ($(DEB_HOST_ARCH),$(findstring $(DEB_HOST_ARCH), i386))
 ARCH_CONFIGURATION = \
