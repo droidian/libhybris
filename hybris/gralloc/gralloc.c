@@ -155,6 +155,11 @@ void hybris_gralloc_deinitialize(void)
     gralloc_hardware_module = NULL;
 }
 
+int hybris_gralloc_get_version(void)
+{
+    return version;
+}
+
 #if HAS_GRALLOC1_HEADER
 static void gralloc1_init(void)
 {

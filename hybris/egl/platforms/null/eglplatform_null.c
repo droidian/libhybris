@@ -17,7 +17,10 @@ static HYBRIS_IMPLEMENT_FUNCTION0(nullui, EGLNativeWindowType, android_createDis
 
 static void nullws_init_module(struct ws_egl_interface *egl_iface)
 {
-        hybris_gralloc_initialize(0);
+	if (hybris_gralloc_get_version() == -1)
+	{
+		hybris_gralloc_initialize(0);
+	}
 	eglplatformcommon_init(egl_iface);
 }
 

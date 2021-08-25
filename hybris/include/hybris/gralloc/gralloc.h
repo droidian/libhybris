@@ -11,6 +11,7 @@ extern "C" {
 void hybris_gralloc_deinitialize(void);
 void hybris_gralloc_initialize(int framebuffer);
 void hybris_gralloc_deinitialize(void);
+int hybris_gralloc_get_version(void);
 int hybris_gralloc_release(buffer_handle_t handle, int was_allocated);
 int hybris_gralloc_retain(buffer_handle_t handle);
 int hybris_gralloc_allocate(int width, int height, int format, int usage, buffer_handle_t *handle, uint32_t *stride);
