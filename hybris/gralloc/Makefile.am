@@ -25,4 +25,5 @@ libgralloc_la_CFLAGS += -ggdb -O0
 endif
 libgralloc_la_LDFLAGS = \
 	$(top_builddir)/hardware/libhardware.la \
+	$(top_builddir)/ui/libui.la \
 	-version-info "1":"0":"0"

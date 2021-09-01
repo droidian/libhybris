@@ -19,6 +19,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libutils \
 	libbinder \
 	libhardware \
+	libhidlbase \
+	liblog \
 	libui
 
 include $(BUILD_SHARED_LIBRARY)

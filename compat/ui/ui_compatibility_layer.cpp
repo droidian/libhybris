@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#include <ui/Gralloc.h>
 #include <ui/GraphicBuffer.h>
 #include <ui/GraphicBufferMapper.h>
 #include <ui/GraphicBufferAllocator.h>
@@ -149,4 +150,68 @@ int graphic_buffer_get_index(struct graphic_buffer *buffer)
 int graphic_buffer_init_check(struct graphic_buffer *buffer)
 {
     return buffer->self->initCheck();
+}
+
+using android::GraphicBufferAllocator;
+using android::GraphicBufferMapper;
+using android::PixelFormat;
+using android::status_t;
+
+status_t graphic_buffer_allocator_allocate(uint32_t width, uint32_t height,
+                                           PixelFormat format, uint32_t layerCount, uint64_t usage,
+                                           buffer_handle_t* handle, uint32_t* stride,
+                                           uint64_t graphicBufferId, const char* requestorName)
+{
+    return GraphicBufferAllocator::getInstance().allocate(width, height, format, layerCount, usage,
+                                                          handle, stride, graphicBufferId, requestorName);
+}
+
+status_t graphic_buffer_allocator_free(buffer_handle_t handle) {
+    return GraphicBufferAllocator::getInstance().free(handle);
+}
+
+status_t graphic_buffer_mapper_import_buffer(buffer_handle_t rawHandle,
+        uint32_t width, uint32_t height, uint32_t layerCount,
+        PixelFormat format, uint64_t usage, uint32_t stride,
+        buffer_handle_t* outHandle)
+{
+    return GraphicBufferMapper::getInstance().importBuffer(rawHandle, width, height, layerCount,
+                                                           format, usage, stride, outHandle);
+}
+
+status_t graphic_buffer_mapper_import_buffer_no_size(buffer_handle_t rawHandle,
+        buffer_handle_t* outHandle)
+{
+    // adapted from GraphicBufferMapper::importBuffer() but skips validation part
+    // needed to implement hybris_gralloc_retain() which doesn't have buffer information passed
+
+    auto &mapper = GraphicBufferMapper::getInstance().getGrallocMapper();
+    buffer_handle_t bufferHandle;
+    status_t error = mapper.importBuffer(android::hardware::hidl_handle(rawHandle), &bufferHandle);
+    if (error != android::NO_ERROR) {
+        ALOGW("importBuffer(%p) failed: %d", rawHandle, error);
+        return error;
+    }
+
+    *outHandle = bufferHandle;
+
+    return android::NO_ERROR;
+}
+
+status_t graphic_buffer_mapper_free_buffer(buffer_handle_t handle) {
+    return GraphicBufferMapper::getInstance().freeBuffer(handle);
+}
+
+
+status_t graphic_buffer_mapper_lock(buffer_handle_t handle, uint32_t usage, const ARect* bounds,
+                                   void** vaddr, int32_t* outBytesPerPixel,
+                                   int32_t* outBytesPerStride) {
+    auto rect = android::Rect(bounds->left, bounds->top, bounds->right, bounds->bottom);
+    return GraphicBufferMapper::getInstance().lock(handle, usage, rect,
+                                                   vaddr, outBytesPerPixel, outBytesPerStride);
+}
+
+status_t graphic_buffer_mapper_unlock(buffer_handle_t handle)
+{
+    return GraphicBufferMapper::getInstance().unlock(handle);
 }
