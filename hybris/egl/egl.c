@@ -337,6 +337,21 @@ static EGLSurface _my_eglCreatePlatformWindowSurfaceEXT(EGLDisplay dpy, EGLConfi
 	return eglCreateWindowSurface(dpy, config, (uintptr_t) native_window, attrib_list);
 }
 
+static EGLSurface _my_eglCreatePlatformWindowSurface(EGLDisplay dpy, EGLConfig config,
+		void *native_window, const EGLAttrib *attrib_list)
+{
+	/*
+	 * TODO: Convert type of parameters here if semantics for native_window
+	 * differs from EGLNativeWindowType. Both Android(-based) platform and
+	 * Wayland platform doesn't have this problem (they both accept a pointer).
+	 * However, a patch for X11 exists, and for X11 platform you pass a pointer
+	 * to Window in this function, but the Window itself (which is an XID) as
+	 * EGLNativeWindowType. The patch probably have to patch this function.
+	 */
+
+	return eglCreateWindowSurface(dpy, config, (uintptr_t) native_window, NULL);
+}
+
 HYBRIS_IMPLEMENT_FUNCTION3(egl, EGLSurface, eglCreatePbufferSurface, EGLDisplay, EGLConfig, const EGLint *);
 HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLSurface, eglCreatePixmapSurface, EGLDisplay, EGLConfig, EGLNativePixmapType, const EGLint *);
 
@@ -543,6 +558,7 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	 */
 	OVERRIDE_TO(eglGetPlatformDisplayEXT, eglGetPlatformDisplay),
 	OVERRIDE_MY(eglCreatePlatformWindowSurfaceEXT),
+	OVERRIDE_MY(eglCreatePlatformWindowSurface),
 	OVERRIDE_TO(eglCreatePlatformPixmapSurfaceEXT, eglCreatePixmapSurface),
 };
 static EGLBoolean _eglHybrisOverrideFunctions_sorted = EGL_FALSE;
