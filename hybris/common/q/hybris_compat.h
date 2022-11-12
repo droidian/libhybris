@@ -50,10 +50,10 @@ extern "C" size_t strlcat(char *dst, const char *src, size_t size);
  * Experimental support for SHT_RELR sections. For details, see proposal
  * at https://groups.google.com/forum/#!topic/generic-abi/bX460iggiKg
  */
-#define DT_RELR 0x6fffe000
-#define DT_RELRSZ 0x6fffe001
-#define DT_RELRENT 0x6fffe003
-#define DT_RELRCOUNT 0x6fffe005
+#define DT_ANDROID_RELR 0x6fffe000
+#define DT_ANDROID_RELRSZ 0x6fffe001
+#define DT_ANDROID_RELRENT 0x6fffe003
+#define DT_ANDROID_RELRCOUNT 0x6fffe005
 /*
  * From bionic/libc/include/elf.h
  *

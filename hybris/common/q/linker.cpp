@@ -3721,15 +3721,15 @@ bool soinfo::prelink_image() {
         return false;
 
 #endif
-      case DT_RELR:
+      case DT_ANDROID_RELR:
         relr_ = reinterpret_cast<ElfW(Relr)*>(load_bias + d->d_un.d_ptr);
         break;
 
-      case DT_RELRSZ:
+      case DT_ANDROID_RELRSZ:
         relr_count_ = d->d_un.d_val / sizeof(ElfW(Relr));
         break;
 
-      case DT_RELRENT:
+      case DT_ANDROID_RELRENT:
         if (d->d_un.d_val != sizeof(ElfW(Relr))) {
           DL_ERR("invalid DT_RELRENT: %zd", static_cast<size_t>(d->d_un.d_val));
           return false;
@@ -3737,7 +3737,7 @@ bool soinfo::prelink_image() {
         break;
 
       // Ignored (see DT_RELCOUNT comments for details).
-      case DT_RELRCOUNT:
+      case DT_ANDROID_RELRCOUNT:
         break;
 
       case DT_INIT:
