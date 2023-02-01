@@ -643,7 +643,7 @@ struct FuncNamePair {
 static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	OVERRIDE_MY(eglCreateImageKHR),
 	OVERRIDE_MY(eglSwapBuffersWithDamageEXT),
-	OVERRIDE_TO(eglSwapBufferWithDamageKHR, eglSwapBuffersWithDamageEXT),
+	OVERRIDE_TO(eglSwapBuffersWithDamageKHR, _my_eglSwapBuffersWithDamageEXT),
 	OVERRIDE_MY(glEGLImageTargetTexture2DOES),
 	OVERRIDE_MY(eglDestroyImageKHR),
 	OVERRIDE_SAMENAME(eglGetError),
