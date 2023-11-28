@@ -120,8 +120,8 @@ void Device::registerCallback(ComposerCallback* callback, int32_t sequenceId) {
     sp<ComposerCallbackBridge> callbackBridge(
             new ComposerCallbackBridge(callback, sequenceId));
     mComposer->registerCallback(callbackBridge);
-    LOG_ALWAYS_FATAL_IF(!callbackBridge->HasPrimaryDisplay(),
-            "Registered composer callback but didn't get primary display");
+//    LOG_ALWAYS_FATAL_IF(!callbackBridge->HasPrimaryDisplay(),
+//            "Registered composer callback but didn't get primary display");
 }
 
 // Required by HWC2 device
