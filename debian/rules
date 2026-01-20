@@ -47,6 +47,7 @@ DEFAULT_CONFIGURATION = \
 	--enable-property-cache \
 	--enable-experimental \
 	--enable-glvnd \
+	--enable-lindroid-drm \
 	--enable-clicd
 ARCH_CONFIGURATION =
 
