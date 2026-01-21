@@ -80,9 +80,6 @@ extern "C" EGLBoolean eglplatformcommon_eglQueryWaylandBufferWL(EGLDisplay dpy,
 	struct wl_resource *buffer, EGLint attribute, EGLint *value)
 {
 	server_wlegl_buffer *buf  = server_wlegl_buffer_from(buffer);
-	if (!buf || !buf->buf)
-		return EGL_FALSE;
-
 	ANativeWindowBuffer* anwb = (ANativeWindowBuffer *) buf->buf;
 
 	if (attribute == EGL_TEXTURE_FORMAT) {
@@ -117,10 +114,10 @@ extern "C" EGLBoolean eglplatformcommon_eglHybrisAcquireNativeBufferWL(EGLDispla
      if (!buffer)
          return EGL_FALSE;
     server_wlegl_buffer *buf  = server_wlegl_buffer_from(wlBuffer);
-    if (!buf || !buf->buf || !buf->buf->isAllocated()) {
+    if (!buf->buf->isAllocated()) {
         // We only return the handles from buffers which are allocated server side. This is because some
         // hardware compositors have problems with client-side allocated buffers.
-        *buffer = 0;
+        buffer = 0;
         return EGL_FALSE;
     }
     ANativeWindowBuffer* anwb = (ANativeWindowBuffer *) buf->buf;
@@ -242,9 +239,6 @@ eglplatformcommon_passthroughImageKHR(EGLContext *ctx, EGLenum *target, EGLClien
 	if (*target == EGL_WAYLAND_BUFFER_WL)
 	{
 		server_wlegl_buffer *buf = server_wlegl_buffer_from((struct wl_resource *)*buffer);
-		if (!buf || !buf->buf)
-			return;
-
 		HYBRIS_TRACE_BEGIN("eglplatformcommon", "Wayland_eglImageKHR", "-resource@%i", wl_resource_get_id((struct wl_resource *)*buffer));
 		HYBRIS_TRACE_END("eglplatformcommon", "Wayland_eglImageKHR", "-resource@%i", wl_resource_get_id((struct wl_resource *)*buffer));
 		if (debugenvchecked == 0)
