@@ -27,19 +27,20 @@ struct ws_egl_interface {
 	EGLNativeWindowType (*get_mapping)(EGLSurface surface);
 };
 
-struct egl_image
-{
-    EGLImageKHR egl_image;
-    EGLClientBuffer egl_buffer;
-    EGLenum target;
-};
-
 /* Defined in egl.c */
 extern struct ws_egl_interface hybris_egl_interface;
 
 struct _EGLDisplay {
 	EGLDisplay dpy;
 	EGLNativeDisplayType display_id;
+};
+
+struct egl_image
+{
+	EGLImageKHR egl_image;
+	EGLenum target;
+	struct _EGLDisplay *ws_dpy;
+	EGLClientBuffer ws_buffer;
 };
 
 struct ws_module {
@@ -55,11 +56,13 @@ struct ws_module {
 	void (*prepareSwap)(EGLDisplay dpy, EGLNativeWindowType win, EGLint *damage_rects, EGLint damage_n_rects);
 	void (*finishSwap)(EGLDisplay dpy, EGLNativeWindowType win);
 	void (*setSwapInterval)(EGLDisplay dpy, EGLNativeWindowType win, EGLint interval);
+	void (*releaseDisplay)(struct _EGLDisplay *dpy);
+	void (*eglInitialized)(struct _EGLDisplay *dpy);
     EGLBoolean (*eglGetConfigAttrib)(struct _EGLDisplay *display, EGLConfig config, EGLint attribute, EGLint *value);
 };
 
 EGLBoolean ws_init(const char * egl_platform);
-void ws_egl_initialized();
+void ws_eglInitialized(struct _EGLDisplay *dpy);
 
 struct _EGLDisplay *ws_GetDisplay(EGLNativeDisplayType native);
 void ws_Terminate(struct _EGLDisplay *dpy);
@@ -71,6 +74,7 @@ const char *ws_eglQueryString(EGLDisplay dpy, EGLint name, const char *(*real_eg
 void ws_prepareSwap(EGLDisplay dpy, EGLNativeWindowType win, EGLint *damage_rects, EGLint damage_n_rects);
 void ws_finishSwap(EGLDisplay dpy, EGLNativeWindowType win);
 void ws_setSwapInterval(EGLDisplay dpy, EGLNativeWindowType win, EGLint interval);
+void ws_releaseDisplay(struct _EGLDisplay *dpy);
 EGLBoolean ws_eglGetConfigAttrib(struct _EGLDisplay *display, EGLConfig config, EGLint attribute, EGLint *value);
 
 #endif

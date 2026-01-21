@@ -65,61 +65,6 @@ static const struct wl_callback_listener frame_listener = {
     wayland_frame_callback
 };
 
-int WaylandNativeWindow::postBuffer(ANativeWindowBuffer* buffer)
-{
-    TRACE("");
-    WaylandNativeWindowBuffer *wnb = NULL;
-
-    lock();
-    std::list<WaylandNativeWindowBuffer *>::iterator it = post_registered.begin();
-    for (; it != post_registered.end(); ++it)
-    {
-        if ((*it)->other == buffer)
-        {
-            wnb = (*it);
-            break;
-        }
-    }
-    unlock();
-    if (!wnb)
-    {
-        wnb = new WaylandNativeWindowBuffer(buffer);
-
-        wnb->common.incRef(&wnb->common);
-        buffer->common.incRef(&buffer->common);
-    }
-
-    int ret = 0;
-
-    lock();
-    wnb->busy = 1;
-    ret = readQueue(false);
-
-    if (ret < 0) {
-        unlock();
-        return ret;
-    }
-
-    if (wnb->wlbuffer == NULL)
-    {
-        wnb->wlbuffer_from_native_handle(m_android_wlegl, m_display, wl_queue);
-        TRACE("%p add listener with %p inside", wnb, wnb->wlbuffer);
-        wl_buffer_add_listener(wnb->wlbuffer, &wl_buffer_listener, this);
-        wl_proxy_set_queue((struct wl_proxy *) wnb->wlbuffer, this->wl_queue);
-        post_registered.push_back(wnb);
-    }
-    TRACE("%p DAMAGE AREA: %dx%d", wnb, wnb->width, wnb->height);
-    wl_surface_attach(m_window->surface, wnb->wlbuffer, 0, 0);
-    wl_surface_damage(m_window->surface, 0, 0, wnb->width, wnb->height);
-    wl_surface_commit(m_window->surface);
-    wl_display_flush(m_display);
-
-    posted.push_back(wnb);
-    unlock();
-
-    return NO_ERROR;
-}
-
 int WaylandNativeWindow::dequeueBuffer(BaseNativeWindowBuffer **buffer, int *fenceFd){
     HYBRIS_TRACE_BEGIN("wayland-platform", "dequeueBuffer", "");
 
@@ -213,16 +158,6 @@ void WaylandNativeWindow::finishSwap()
         return;
     }
 
-    WaylandNativeWindowBuffer *wnb = queue.front();
-    if (!wnb) {
-        wnb = m_lastBuffer;
-    } else {
-        queue.pop_front();
-    }
-    assert(wnb);
-    m_lastBuffer = wnb;
-    wnb->busy = 1;
-
     ret = readQueue(false);
     if (this->frame_callback) {
         do {
@@ -230,38 +165,69 @@ void WaylandNativeWindow::finishSwap()
         } while (this->frame_callback && ret != -1);
     }
     if (ret < 0) {
-        HYBRIS_TRACE_END("wayland-platform", "queueBuffer_wait_for_frame_callback", "-%p", wnb);
+        HYBRIS_TRACE_END("wayland-platform", "queueBuffer_wait_for_frame_callback", "");
         unlock();
         return;
     }
 
-    if (wnb->wlbuffer == NULL)
-    {
-        wnb->init(m_android_wlegl, m_display, wl_queue);
-        TRACE("%p add listener with %p inside", wnb, wnb->wlbuffer);
-        wl_buffer_add_listener(wnb->wlbuffer, &wl_buffer_listener, this);
-        wl_proxy_set_queue((struct wl_proxy *) wnb->wlbuffer, this->wl_queue);
-    }
-
     if (m_swap_interval > 0) {
-        this->frame_callback = wl_surface_frame(m_window->surface);
+        this->frame_callback = wl_surface_frame(wl_surface_wrapper);
         wl_callback_add_listener(this->frame_callback, &frame_listener, this);
-        wl_proxy_set_queue((struct wl_proxy *) this->frame_callback, this->wl_queue);
     }
 
-    wl_surface_attach(m_window->surface, wnb->wlbuffer, 0, 0);
-    wl_surface_damage(m_window->surface, 0, 0, wnb->width, wnb->height);
-    wl_surface_commit(m_window->surface);
-    // Some compositors, namely Weston, queue buffer release events instead
-    // of sending them immediately.  If a frame event is used, this should
-    // not be a problem.  Without a frame event, we need to send a sync
-    // request to ensure that they get flushed.
-    wl_callback_destroy(wl_display_sync(m_display));
-    wl_display_flush(m_display);
-    fronted.push_back(wnb);
+    WaylandNativeWindowBuffer *wnb = NULL;
+    if (!queue.empty()) {
+        wnb = queue.front();
+        queue.pop_front();
+    }
 
-    m_window->attached_width = wnb->width;
-    m_window->attached_height = wnb->height;
+    if (wnb) {
+        assert(wnb->busy == 1);
+
+        if (!wnb->wlbuffer) {
+            wnb->init(m_android_wlegl, m_display, wl_queue);
+            TRACE("%p add listener with %p inside", wnb, wnb->wlbuffer);
+            wl_buffer_add_listener(wnb->wlbuffer, &wl_buffer_listener, this);
+        }
+
+        wl_surface_attach(wl_surface_wrapper, wnb->wlbuffer, 0, 0);
+
+        m_window->attached_width = wnb->width;
+        m_window->attached_height = wnb->height;
+
+        fronted.push_back(wnb);
+    }
+
+    // If the compositor doesn't support damage_buffer, we deliberately
+    // ignore the damage region and post maximum damage, due to
+    // https://bugs.freedesktop.org/78190
+    if (wl_proxy_get_version((struct wl_proxy *) wl_surface_wrapper) >=
+        WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
+        if (m_damage_n_rects > 0 && m_window->attached_height > 0) {
+            for (int i = 0; i < m_damage_n_rects; i++) {
+                const int *rect = &m_damage_rects[i * 4];
+                wl_surface_damage_buffer(wl_surface_wrapper,
+                                         rect[0], m_window->attached_height - rect[1] - rect[3],
+                                         rect[2], rect[3]);
+            }
+        } else if (wnb) {
+            wl_surface_damage_buffer(wl_surface_wrapper, 0, 0, INT32_MAX, INT32_MAX);
+        }
+    } else if (wnb) {
+        wl_surface_damage(wl_surface_wrapper, 0, 0, INT32_MAX, INT32_MAX);
+    }
+
+    wl_surface_commit(wl_surface_wrapper);
+
+    // If we're not waiting for a frame callback then we'll at least throttle
+    // to a sync callback so that we always give a chance for the compositor to
+    // handle the commit and send a release event before checking for a free buffer.
+    if (this->frame_callback == NULL) {
+        this->frame_callback = wl_display_sync(wl_dpy_wrapper);
+        wl_callback_add_listener(this->frame_callback, &frame_listener, this);
+    }
+
+    wl_display_flush(m_display);
 
     m_damage_rects = NULL;
     m_damage_n_rects = 0;

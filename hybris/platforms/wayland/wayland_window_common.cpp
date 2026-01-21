@@ -68,7 +68,10 @@ void WaylandNativeWindowBuffer::wlbuffer_from_native_handle(struct android_wlegl
     ints_data = (int*) wl_array_add(&ints, handle->numInts*sizeof(int));
     memcpy(ints_data, handle->data + handle->numFds, handle->numInts*sizeof(int));
 
-    wlegl_handle = android_wlegl_create_handle(android_wlegl, handle->numFds, &ints);
+    struct android_wlegl *android_wlegl_wrapper = (struct android_wlegl *) wl_proxy_create_wrapper(android_wlegl);
+    wl_proxy_set_queue((struct wl_proxy *) android_wlegl_wrapper, queue);
+
+    wlegl_handle = android_wlegl_create_handle(android_wlegl_wrapper, handle->numFds, &ints);
 
     wl_array_release(&ints);
 
@@ -76,16 +79,21 @@ void WaylandNativeWindowBuffer::wlbuffer_from_native_handle(struct android_wlegl
         android_wlegl_handle_add_fd(wlegl_handle, handle->data[i]);
     }
 
-    wlbuffer = android_wlegl_create_buffer(android_wlegl,
+    wlbuffer = android_wlegl_create_buffer(android_wlegl_wrapper,
             width, height, stride,
-            format, usage, wlegl_handle);
-    wl_proxy_set_queue((struct wl_proxy *) wlbuffer, queue);
+            format, (uint32_t)usage, wlegl_handle);
 
     android_wlegl_handle_destroy(wlegl_handle);
 
-    creation_callback = wl_display_sync(display);
+    wl_proxy_wrapper_destroy(android_wlegl_wrapper);
+
+    struct wl_display *display_wrapper = (struct wl_display *) wl_proxy_create_wrapper(display);
+    wl_proxy_set_queue((struct wl_proxy *) display_wrapper, queue);
+
+    creation_callback = wl_display_sync(display_wrapper);
     wl_callback_add_listener(creation_callback, &buffer_create_sync_listener, &creation_callback);
-    wl_proxy_set_queue((struct wl_proxy *)creation_callback, queue);
+
+    wl_proxy_wrapper_destroy(display_wrapper);
 }
 
 void WaylandNativeWindow::resize(unsigned int width, unsigned int height)
@@ -167,6 +175,10 @@ WaylandNativeWindow::WaylandNativeWindow(struct wl_egl_window *window,
     this->m_window->destroy_window_callback = destroy_window_callback;
     this->frame_callback = NULL;
     this->wl_queue = wl_display_create_queue(display);
+    this->wl_dpy_wrapper = (struct wl_display *) wl_proxy_create_wrapper(display);
+    wl_proxy_set_queue((struct wl_proxy *) wl_dpy_wrapper, wl_queue);
+    this->wl_surface_wrapper = (struct wl_surface *) wl_proxy_create_wrapper(m_window->surface);
+    wl_proxy_set_queue((struct wl_proxy *) wl_surface_wrapper, wl_queue);
     this->m_format = 1;
 
     const_cast<int&>(ANativeWindow::minSwapInterval) = 0;
@@ -174,14 +186,13 @@ WaylandNativeWindow::WaylandNativeWindow(struct wl_egl_window *window,
     // This is the default as per the EGL documentation
     this->m_swap_interval = 1;
 
-    m_usage=GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE;
+    m_usage = GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE;
     pthread_mutex_init(&mutex, NULL);
     pthread_cond_init(&cond, NULL);
     m_queueReads = 0;
     m_freeBufs = 0;
     m_damage_rects = NULL;
     m_damage_n_rects = 0;
-    m_lastBuffer = 0;
     WaylandNativeWindow::setBufferCount(3);
     HYBRIS_TRACE_END("wayland-platform", "create_window", "");
 }
@@ -191,6 +202,8 @@ WaylandNativeWindow::~WaylandNativeWindow()
     destroyBuffers();
     if (frame_callback)
         wl_callback_destroy(frame_callback);
+    wl_proxy_wrapper_destroy(wl_surface_wrapper);
+    wl_proxy_wrapper_destroy(wl_dpy_wrapper);
     wl_event_queue_destroy(wl_queue);
     if (m_window) {
         m_window->driver_private = NULL;
@@ -229,23 +242,7 @@ int WaylandNativeWindow::setSwapInterval(int interval) {
 
 void WaylandNativeWindow::releaseBuffer(struct wl_buffer *buffer)
 {
-    std::list<WaylandNativeWindowBuffer *>::iterator it = posted.begin();
-
-    for (; it != posted.end(); ++it)
-    {
-        if ((*it)->wlbuffer == buffer)
-            break;
-    }
-
-    if (it != posted.end())
-    {
-        WaylandNativeWindowBuffer* pwnb = *it;
-        posted.erase(it);
-        TRACE("released posted buffer: %p", buffer);
-        pwnb->busy = 0;
-        unlock();
-        return;
-    }
+    std::list<WaylandNativeWindowBuffer *>::iterator it;
 
     it = fronted.begin();
 
@@ -357,7 +354,7 @@ int WaylandNativeWindow::cancelBuffer(BaseNativeWindowBuffer* buffer, int fenceF
         // event. Since we have now cancelled a buffer push an artificial event so that the dispatch returns
         // and the thread can notice the cancelled buffer. This means there is a delay of one roundtrip,
         // but I don't see other solution except having one dedicated thread for calling wl_display_dispatch_queue().
-        wl_callback_destroy(wl_display_sync(m_display));
+        wl_callback_destroy(wl_display_sync(wl_dpy_wrapper));
     }
 
     HYBRIS_TRACE_END("wayland-platform", "cancelBuffer", "-%p", wnb);
@@ -419,6 +416,7 @@ unsigned int WaylandNativeWindow::getUsage() const {
 }
 
 int WaylandNativeWindow::setBuffersFormat(int format) {
+    lock();
     if (format != m_format)
     {
         TRACE("old-format:x%x new-format:x%x", m_format, format);
@@ -427,6 +425,7 @@ int WaylandNativeWindow::setBuffersFormat(int format) {
     } else {
         TRACE("format:x%x", format);
     }
+    unlock();
     return NO_ERROR;
 }
 
@@ -460,7 +459,6 @@ void WaylandNativeWindow::destroyBuffers()
     for (; it!=m_bufList.end(); ++it)
     {
         destroyBuffer(*it);
-        it = m_bufList.erase(it);
     }
     m_bufList.clear();
     m_freeBufs = 0;
@@ -519,6 +517,7 @@ int WaylandNativeWindow::setBufferCount(int cnt) {
 
 
 int WaylandNativeWindow::setBuffersDimensions(int width, int height) {
+    lock();
     if (m_width != width || m_height != height)
     {
         TRACE("old-size:%ix%i new-size:%ix%i", m_width, m_height, width, height);
@@ -528,18 +527,23 @@ int WaylandNativeWindow::setBuffersDimensions(int width, int height) {
     } else {
         TRACE("size:%ix%i", width, height);
     }
+    unlock();
     return NO_ERROR;
 }
 
 int WaylandNativeWindow::setUsage(uint64_t usage) {
-    if ((usage | GRALLOC_USAGE_HW_TEXTURE) != m_usage)
+    usage |= GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE;
+
+    lock();
+    if (usage != m_usage)
     {
         TRACE("old-usage:x%" PRIx64 " new-usage:x%" PRIx64, m_usage, usage);
-        m_usage = usage | GRALLOC_USAGE_HW_TEXTURE;
+        m_usage = usage;
         /* Buffers will be re-allocated when dequeued */
     } else {
         TRACE("usage:x%" PRIx64, usage);
     }
+    unlock();
     return NO_ERROR;
 }
 
@@ -612,7 +616,7 @@ static const struct android_wlegl_server_buffer_handle_listener server_handle_li
 ServerWaylandBuffer::ServerWaylandBuffer(unsigned int w,
                                          unsigned int h,
                                          int _format,
-                                         int _usage,
+                                         uint64_t _usage,
                                          android_wlegl *android_wlegl,
                                          struct wl_event_queue *queue)
                    : WaylandNativeWindowBuffer()
@@ -625,9 +629,14 @@ ServerWaylandBuffer::ServerWaylandBuffer(unsigned int w,
     wl_array_init(&ints);
     wl_array_init(&fds);
 
-    ssb = android_wlegl_get_server_buffer_handle(android_wlegl, width, height, _format, _usage);
+    struct android_wlegl *android_wlegl_wrapper = (struct android_wlegl *) wl_proxy_create_wrapper(android_wlegl);
+    wl_proxy_set_queue((struct wl_proxy *) android_wlegl_wrapper, queue);
+
+    ssb = android_wlegl_get_server_buffer_handle(android_wlegl_wrapper, width, height, _format, (uint32_t)_usage);
     wl_proxy_set_queue((struct wl_proxy *) ssb, queue);
     android_wlegl_server_buffer_handle_add_listener(ssb, &server_handle_listener, this);
+
+    wl_proxy_wrapper_destroy(android_wlegl_wrapper);
 }
 
 ServerWaylandBuffer::~ServerWaylandBuffer()

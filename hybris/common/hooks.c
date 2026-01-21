@@ -1415,7 +1415,13 @@ struct bionic_sbuf {
 };
 #endif
 
-typedef off_t bionic_fpos_t;
+#if defined(__LP64__)
+typedef int64_t bionic_off_t;
+#else
+// bionic uses 32-bit off_t on 32-bit architectures
+typedef __kernel_off_t bionic_off_t;
+#endif
+typedef bionic_off_t bionic_fpos_t;
 typedef off64_t bionic_fpos64_t;
 
 /* "struct __sFILE" from bionic/libc/include/stdio.h */
@@ -1630,7 +1636,7 @@ static int _hybris_hook_fseek(FILE *fp, long offset, int whence)
     return fseek(_get_actual_fp(fp), offset, whence);
 }
 
-static int _hybris_hook_fseeko(FILE *fp, off_t offset, int whence)
+static int _hybris_hook_fseeko(FILE *fp, bionic_off_t offset, int whence)
 {
     TRACE_HOOK("fp %p offset %ld whence %d", fp, offset, whence);
 
@@ -1673,14 +1679,14 @@ static long _hybris_hook_ftell(FILE *fp)
     return ftell(_get_actual_fp(fp));
 }
 
-static off_t _hybris_hook_ftello(FILE *fp)
+static bionic_off_t _hybris_hook_ftello(FILE *fp)
 {
     TRACE_HOOK("fp %p", fp);
 
     return ftello(_get_actual_fp(fp));
 }
 
-static off_t _hybris_hook_ftello64(FILE *fp)
+static off64_t _hybris_hook_ftello64(FILE *fp)
 {
     TRACE_HOOK("fp %p", fp);
 
@@ -2074,7 +2080,7 @@ static int _hybris_hook_scandirat(int fd, const char *dir,
             result[nItems++] = filter_r;
         }
         if (nItems && compar != NULL) // sort
-            qsort(result, nItems, sizeof(struct bionic_dirent *), (int (*)(const void *, const void *))compar);
+            qsort(result, nItems, sizeof(struct bionic_dirent *), (int (*)(const void *, const void *)) compar);
 
         *namelist = result;
     }
@@ -2560,7 +2566,7 @@ static char* _hybris_hook_setlocale(int category, const char *locale)
 }
 
 static void* _hybris_hook_mmap(void *addr, size_t len, int prot,
-                  int flags, int fd, off_t offset)
+                  int flags, int fd, bionic_off_t offset)
 {
     TRACE_HOOK("addr %p len %zu prot %i flags %i fd %i offset %ld",
                addr, len, prot, flags, fd, offset);
@@ -2874,6 +2880,12 @@ void _hybris_hook_free(void *ptr)
 #if !defined(cfree)
 #define cfree free
 #endif
+
+int _hybris_hook_android_fdsan_set_error_level(int new_level)
+{
+    TRACE_HOOK("new_level %d", new_level);
+    return new_level;
+}
 
 void _hybris_hook_android_fdsan_exchange_owner_tag(int fd, uint64_t expected_tag, uint64_t new_tag)
 {
@@ -3247,7 +3259,11 @@ static struct _hook hooks_mm[] = {
     HOOK_DIRECT(localeconv),
     HOOK_DIRECT(setlocale),
     /* sys/mman.h */
+#if defined(LP64)
     HOOK_DIRECT(mmap),
+#else
+    HOOK_INDIRECT(mmap),
+#endif
     HOOK_DIRECT(munmap),
     /* wchar.h */
     HOOK_DIRECT_NO_DEBUG(wmemchr),
@@ -3337,6 +3353,7 @@ static struct _hook hooks_p[] = {
     HOOK_INDIRECT(fgets_unlocked),
     HOOK_INDIRECT(fputs_unlocked),
     /* fdsan.h */
+    HOOK_INDIRECT(android_fdsan_set_error_level),
     HOOK_INDIRECT(android_fdsan_exchange_owner_tag),
     HOOK_INDIRECT(android_fdsan_close_with_tag),
     /* pthread.h */

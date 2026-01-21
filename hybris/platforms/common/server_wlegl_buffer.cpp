@@ -42,6 +42,8 @@ static const struct wl_buffer_interface server_wlegl_buffer_impl = {
 server_wlegl_buffer *
 server_wlegl_buffer_from(struct wl_resource *buffer)
 {
+	if (!buffer || !wl_resource_instance_of(buffer, &wl_buffer_interface, &server_wlegl_buffer_impl))
+		return NULL;
 	return static_cast<server_wlegl_buffer *>(wl_resource_get_user_data(buffer));
 }
 
@@ -60,7 +62,7 @@ server_wlegl_buffer_create(wl_client *client,
 			   int32_t height,
 			   int32_t stride,
 			   int32_t format,
-			   int32_t usage,
+			   int64_t usage,
 			   buffer_handle_t handle,
 			   server_wlegl *wlegl)
 {
@@ -90,7 +92,7 @@ server_wlegl_buffer_create_server(wl_client *client,
 			   int32_t height,
 			   int32_t stride,
 			   int32_t format,
-			   int32_t usage,
+			   int64_t usage,
 			   buffer_handle_t handle,
 			   server_wlegl *wlegl)
 {

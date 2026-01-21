@@ -52,7 +52,6 @@ public:
     void frame();
     void resize(unsigned int width, unsigned int height);
     void releaseBuffer(struct wl_buffer *buffer);
-    int postBuffer(ANativeWindowBuffer *buffer);
 
     virtual int setSwapInterval(int interval);
     void prepareSwap(EGLint *damage_rects, EGLint damage_n_rects);
@@ -94,12 +93,9 @@ private:
 
     std::list<WaylandNativeWindowBuffer *> m_bufList;
     std::list<WaylandNativeWindowBuffer *> fronted;
-    std::list<WaylandNativeWindowBuffer *> posted;
-    std::list<WaylandNativeWindowBuffer *> post_registered;
     std::deque<WaylandNativeWindowBuffer *> queue;
     struct wl_egl_window *m_window;
     struct wl_display *m_display;
-    WaylandNativeWindowBuffer *m_lastBuffer;
     int m_width;
     int m_height;
     int m_format;
@@ -114,6 +110,8 @@ private:
     EGLint *m_damage_rects, m_damage_n_rects;
     struct wl_callback *frame_callback;
     int m_swap_interval;
+    struct wl_display *wl_dpy_wrapper;
+    struct wl_surface *wl_surface_wrapper;
 };
 
 #endif

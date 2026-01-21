@@ -42,7 +42,7 @@ static pthread_mutex_t _mutex = PTHREAD_MUTEX_INITIALIZER;
 FbDevNativeWindowBuffer::FbDevNativeWindowBuffer(unsigned int width,
                             unsigned int height,
                             unsigned int format,
-                            unsigned int usage)
+                            uint64_t usage)
 {
     ANativeWindowBuffer::width  = width;
     ANativeWindowBuffer::height = height;
@@ -51,7 +51,7 @@ FbDevNativeWindowBuffer::FbDevNativeWindowBuffer(unsigned int width,
     busy = 0;
     status = 0;
 
-    hybris_gralloc_allocate(width, height, format, usage, &handle, (uint32_t*)&stride);
+    hybris_gralloc_allocate(width, height, format, (uint32_t)usage, &handle, (uint32_t*)&stride);
 
     TRACE("width=%d height=%d stride=%d format=x%x usage=x%x status=%s this=%p",
         width, height, stride, format, usage, strerror(-status), this);
@@ -471,6 +471,7 @@ unsigned int FbDevNativeWindow::getUsage() const
  */
 int FbDevNativeWindow::setUsage(uint64_t usage)
 {
+    usage |= GRALLOC_USAGE_HW_FB;
     m_allocateBuffers = (m_usage != usage);
     TRACE("usage=x%" PRIx64 " m_allocateBuffers=%d", usage, m_allocateBuffers);
     m_usage = usage;
@@ -514,7 +515,9 @@ void FbDevNativeWindow::reallocateBuffers()
     for(int i = 0; i < m_bufferCount; i++)
     {
         FbDevNativeWindowBuffer *fbnb = new FbDevNativeWindowBuffer(hybris_gralloc_fbdev_width(),
-                            hybris_gralloc_fbdev_height(), hybris_gralloc_fbdev_format(), m_usage|GRALLOC_USAGE_HW_FB);
+                                                                    hybris_gralloc_fbdev_height(),
+                                                                    m_bufFormat,
+                                                                    m_usage);
 
         fbnb->common.incRef(&fbnb->common);
 
