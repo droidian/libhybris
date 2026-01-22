@@ -81,6 +81,8 @@ static EGLBoolean  (*_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface) = NULL
 static EGLImageKHR (*_eglCreateImageKHR)(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list) = NULL;
 static EGLBoolean (*_eglDestroyImageKHR) (EGLDisplay dpy, EGLImageKHR image) = NULL;
 
+static EGLBoolean (*_eglGetConfigAttrib)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value) = NULL;
+
 static void (*_glEGLImageTargetTexture2DOES) (GLenum target, GLeglImageOES image) = NULL;
 static void (*_glEGLImageTargetRenderbufferStorageOES) (GLenum target, GLeglImageOES image) = NULL;
 
@@ -315,6 +317,9 @@ EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
 			}
 			break;
 #endif
+		case EGL_PLATFORM_GBM_KHR:
+			hybris_ws = "lindroid-drm";
+			break;
 
 		case EGL_PLATFORM_X11_KHR:
 			hybris_ws = "x11";
@@ -618,6 +623,15 @@ EGLBoolean eglSwapBuffers(EGLDisplay dpy, EGLSurface surface)
 
 HYBRIS_EGL_IMPLEMENT_FUNCTION3(egl, EGLBoolean, eglCopyBuffers, EGLDisplay, EGLSurface, EGLNativePixmapType);
 
+EGLBoolean eglGetConfigAttrib(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value) {
+	EGLBoolean ret;
+	HYBRIS_TRACE_BEGIN("hybris-egl", "eglGetConfigAttrib", "");
+	HYBRIS_DLSYSM(egl, &_eglGetConfigAttrib, "eglGetConfigAttrib");
+	ret = (*_eglGetConfigAttrib)(dpy, config, attribute, value);
+	ws_getConfigAttrib(&dpy, &config, &attribute, value);
+	HYBRIS_TRACE_END("hybris-egl", "eglGetConfigAttrib", "");
+	return ret;
+}
 
 static EGLImageKHR _my_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list)
 {
@@ -720,6 +734,7 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	OVERRIDE_SAMENAME(eglCopyBuffers),
 	OVERRIDE_SAMENAME(eglQueryString),
 	OVERRIDE_SAMENAME(eglSetDamageRegionKHR),
+	OVERRIDE_SAMENAME(eglGetConfigAttrib),
 	/*
 	 * EGL_EXT_platform_base, in case Android EGL or glvnd advertise its
 	 * support.
