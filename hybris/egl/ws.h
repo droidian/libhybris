@@ -59,7 +59,6 @@ struct ws_module {
 	void (*releaseDisplay)(struct _EGLDisplay *dpy);
 	void (*eglInitialized)(struct _EGLDisplay *dpy);
 	void (*destroyImageKHR)(EGLImageKHR image);
-    EGLBoolean (*eglGetConfigAttrib)(struct _EGLDisplay *display, EGLConfig config, EGLint attribute, EGLint *value);
 };
 
 EGLBoolean ws_init(const char * egl_platform);
@@ -77,6 +76,5 @@ void ws_prepareSwap(EGLDisplay dpy, EGLNativeWindowType win, EGLint *damage_rect
 void ws_finishSwap(EGLDisplay dpy, EGLNativeWindowType win);
 void ws_setSwapInterval(EGLDisplay dpy, EGLNativeWindowType win, EGLint interval);
 void ws_releaseDisplay(struct _EGLDisplay *dpy);
-EGLBoolean ws_eglGetConfigAttrib(struct _EGLDisplay *display, EGLConfig config, EGLint attribute, EGLint *value);
 
 #endif
