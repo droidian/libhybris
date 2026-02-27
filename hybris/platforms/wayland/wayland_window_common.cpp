@@ -786,7 +786,8 @@ void DrmWaylandBuffer::init(struct android_wlegl *android_wlegl, struct wl_displ
 DrmWaylandBuffer::~DrmWaylandBuffer() {
     if (bo) gbm_bo_destroy(bo);
     if (dmabuf_fd >= 0) close(dmabuf_fd);
-    if (handle) native_handle_close(handle);
+    if (handle)
+        hybris_gralloc_release(handle, 1);
 }
 #endif // WANT_LINDROID_DRM
 // vim: noai:ts=4:sw=4:ss=4:expandtab
